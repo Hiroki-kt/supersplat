@@ -56,6 +56,8 @@ const getURLArgs = () => {
     params.forEach((value: string, key: string) => {
         apply(key, value);
     });
+    console.log('config');
+    console.log(config);
 
     return config;
 };

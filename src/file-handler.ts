@@ -22,6 +22,7 @@ interface SceneWriteOptions {
     type: ExportType;
     filename?: string;
     stream?: FileSystemWritableFileStream;
+    remote?: RemoteStorageDetails;
 }
 
 const filePickerTypes = {
@@ -57,6 +58,7 @@ const vec = new Vec3();
 
 // download the data to the given filename
 const download = (filename: string, data: Uint8Array) => {
+    console.log('downloading');
     const blob = new Blob([data], { type: 'octet/stream' });
     const url = window.URL.createObjectURL(blob);
 
@@ -81,6 +83,7 @@ const download = (filename: string, data: Uint8Array) => {
 
 // send the file to the remote storage
 const sendToRemoteStorage = async (filename: string, data: ArrayBuffer, remoteStorageDetails: RemoteStorageDetails) => {
+    console.log('sending to remote');
     const formData = new FormData();
     formData.append('file', new Blob([data], { type: 'octet/stream' }), filename);
     formData.append('preserveThumbnail', 'true');
@@ -305,6 +308,20 @@ const initFileHandler = (scene: Scene, events: Events, dropTarget: HTMLElement, 
         }
     });
 
+    events.on('scene.uploadConerf', async () => {
+        console.log('uploading conerf');
+        // const splats = getSplats();
+        // const splat = splats[0];
+
+        await events.invoke('scene.write', {
+            type: 'ply',
+            remote: {
+                method: 'POST',
+                url: 'http://192.168.1.12:8000/api/v1/conerf/upload_ply'
+            }
+        });
+    });
+
     events.function('scene.export', async (type: ExportType, outputFilename: string = null, exportType: 'export' | 'saveAs' = 'export') => {
         const extensions = {
             'ply': '.ply',
@@ -424,6 +441,32 @@ const initFileHandler = (scene: Scene, events: Events, dropTarget: HTMLElement, 
                 };
                 await writeScene(options.type, writeFunc);
                 download(options.filename, (cursor === data.byteLength) ? data : new Uint8Array(data.buffer, 0, cursor));
+            } else if (options.remote) {
+                console.log('writing to remote');
+                let data: Uint8Array = null;
+                let cursor = 0;
+
+                const writeFunc = (chunk: Uint8Array, finalWrite?: boolean) => {
+                    if (!data) {
+                        data = finalWrite ? chunk : chunk.slice();
+                        cursor = chunk.byteLength;
+                    } else {
+                        if (data.byteLength < cursor + chunk.byteLength) {
+                            let newSize = data.byteLength * 2;
+                            while (newSize < cursor + chunk.byteLength) {
+                                newSize *= 2;
+                            }
+                            const newData = new Uint8Array(newSize);
+                            newData.set(data);
+                            data = newData;
+                        }
+                        data.set(chunk, cursor);
+                        cursor += chunk.byteLength;
+                    }
+                };
+                await writeScene(options.type, writeFunc);
+                await sendToRemoteStorage(options.filename, data.slice(0, cursor), options.remote);
+                // download('test.ply', (cursor === data.byteLength) ? data : new Uint8Array(data.buffer, 0, cursor));
             }
         } catch (error) {
             events.invoke('showPopup', {

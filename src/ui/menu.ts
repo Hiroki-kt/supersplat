@@ -49,8 +49,19 @@ class Menu extends Container {
             window.open('https://playcanvas.com', '_blank').focus();
         });
 
+        const exportDom = document.createElement('button');
+        exportDom.textContent = localize('export');
+        exportDom.addEventListener('click', () => {
+            console.log('click export');
+            events.fire('scene.uploadConerf');
+        });
+
         const icon = new Element({
             dom: iconDom
+        });
+
+        const exportButton = new Element({
+            dom: exportDom
         });
 
         const scene = new Label({
@@ -98,6 +109,7 @@ class Menu extends Container {
         buttonsContainer.append(arrow);
 
         menubar.append(icon);
+        menubar.append(exportButton);
         menubar.append(buttonsContainer);
 
         const exportMenuPanel = new MenuPanel([{
