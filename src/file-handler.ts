@@ -14,6 +14,9 @@ type FilePickerAcceptType = unknown;
 interface RemoteStorageDetails {
     method: string;
     url: string;
+    jobId?: string;
+    isMatched?: boolean;
+    version?: number;
 }
 
 type ExportType = 'ply' | 'compressed-ply' | 'splat' | 'viewer';
@@ -82,11 +85,22 @@ const download = (filename: string, data: Uint8Array) => {
 };
 
 // send the file to the remote storage
-const sendToRemoteStorage = async (filename: string, data: ArrayBuffer, remoteStorageDetails: RemoteStorageDetails) => {
+const sendToRemoteStorage = async (
+    filename: string,
+    data: ArrayBuffer,
+    remoteStorageDetails: RemoteStorageDetails
+) => {
     console.log('sending to remote');
     const formData = new FormData();
-    formData.append('file', new Blob([data], { type: 'octet/stream' }), filename);
-    formData.append('preserveThumbnail', 'true');
+    formData.append('file', new Blob([data], { type: 'application/octet-stream' }), filename);
+    formData.append('job_id', remoteStorageDetails.jobId);
+    console.log(remoteStorageDetails);
+    if (remoteStorageDetails.isMatched) {
+        console.log('is matched');
+        formData.append('is_matched', 'True');
+        formData.append('version', remoteStorageDetails.version.toString());
+    }
+    console.log(formData);
     await fetch(remoteStorageDetails.url, {
         method: remoteStorageDetails.method,
         body: formData
@@ -308,17 +322,14 @@ const initFileHandler = (scene: Scene, events: Events, dropTarget: HTMLElement, 
         }
     });
 
-    events.on('scene.uploadConerf', async () => {
+    events.on('scene.uploadConerf', async (plyId: number) => {
         console.log('uploading conerf');
         // const splats = getSplats();
         // const splat = splats[0];
 
         await events.invoke('scene.write', {
             type: 'ply',
-            remote: {
-                method: 'POST',
-                url: 'http://192.168.1.12:8000/api/v1/conerf/upload_ply'
-            }
+            remote: remoteStorageDetails
         });
     });
 

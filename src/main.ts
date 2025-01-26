@@ -98,10 +98,13 @@ const main = async () => {
     const url = new URL(window.location.href);
 
     // decode remote storage details
-    let remoteStorageDetails;
-    try {
-        remoteStorageDetails = JSON.parse(decodeURIComponent(url.searchParams.get('remoteStorage')));
-    } catch (e) { }
+    const remoteStorageDetails = {
+        method: 'POST',
+        url: 'http://192.168.1.20:8000/api/v1/conerf/upload_ply/',
+        jobId: url.searchParams.getAll('job')[0],
+        isMatched: url.searchParams.getAll('is_matched')[0] || false,
+        version: url.searchParams.getAll('version')[0] || 0
+    };
 
     // root events object
     const events = new Events();
