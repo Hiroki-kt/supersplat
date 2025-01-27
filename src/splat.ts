@@ -12,13 +12,15 @@ import {
     Mat4,
     Quat,
     Texture,
-    Vec3
+    Vec3,
+    MeshInstance
 } from 'playcanvas';
 
 import { Element, ElementType } from './element';
 import { Serializer } from './serializer';
-import { vertexShader, fragmentShader } from './shaders/splat-shader';
+import { vertexShader, fragmentShader, gsplatCenter } from './shaders/splat-shader';
 import { State } from './splat-state';
+import { Transform } from './transform';
 import { TransformPalette } from './transform-palette';
 
 const vec = new Vec3();
@@ -77,7 +79,8 @@ class Splat extends Element {
         // get material options object for a shader that renders with the given number of bands
         const materialOptions = {
             vertex: vertexShader,
-            fragment: fragmentShader
+            fragment: fragmentShader,
+            chunks: { gsplatCenterVS: gsplatCenter }
         };
 
         this.asset = asset;
@@ -86,6 +89,24 @@ class Splat extends Element {
         this.entity = splatResource.instantiate(materialOptions);
 
         const instance = this.entity.gsplat.instance;
+
+        // use custom render order distance calculation for splats
+        instance.meshInstance.calculateSortDistance = (meshInstance: MeshInstance, pos: Vec3, dir: Vec3) => {
+            const bound = this.localBound;
+            const mat = this.entity.getWorldTransform();
+            let maxDist;
+            for (let i = 0; i < 8; ++i) {
+                vec.x = bound.center.x + bound.halfExtents.x * (i & 1 ? 1 : -1);
+                vec.y = bound.center.y + bound.halfExtents.y * (i & 2 ? 1 : -1);
+                vec.z = bound.center.z + bound.halfExtents.z * (i & 4 ? 1 : -1);
+                mat.transformPoint(vec, vec);
+                const dist = vec.sub(pos).dot(dir);
+                if (i === 0 || dist > maxDist) {
+                    maxDist = dist;
+                }
+            }
+            return maxDist;
+        };
 
         // added per-splat state channel
         // bit 1: selected
@@ -121,13 +142,9 @@ class Splat extends Element {
         this.transformPalette = new TransformPalette(splatResource.device);
 
         this.rebuildMaterial = (bands: number) => {
-            // @ts-ignore
             instance.createMaterial(materialOptions);
-
-            const material = instance.material;
-
-            const numBands = instance.splat.hasSH ? bands : 0;
-            material.setDefine('SH_BANDS', `${numBands}`);
+            const { material } = instance;
+            material.setDefine('SH_BANDS', `${Math.min(bands, instance.splat.shBands)}`);
             material.setParameter('splatState', this.stateTexture);
             material.setParameter('splatTransform', this.transformTexture);
             material.setParameter('transformPalette', this.transformPalette.texture);
@@ -242,7 +259,7 @@ class Splat extends Element {
     }
 
     get filename() {
-        return this.asset.file.filename;
+        return (this.asset.file as any).filename;
     }
 
     calcSplatWorldPosition(splatId: number, result: Vec3) {
@@ -266,8 +283,6 @@ class Splat extends Element {
     }
 
     add() {
-        this.entity.gsplat.layers = this.entity.gsplat.layers.concat([this.scene.overlayLayer.id]);
-
         // add the entity to the scene
         this.scene.contentRoot.addChild(this.entity);
 
@@ -303,7 +318,7 @@ class Splat extends Element {
         material.setParameter('mode', cameraMode === 'rings' ? 1 : 0);
         material.setParameter('ringSize', (selected && cameraOverlay && cameraMode === 'rings') ? 0.04 : 0);
 
-        const selectionAlpha = events.invoke('view.outlineSelection') ? 0 : this.selectionAlpha;
+        const selectionAlpha = selected && !events.invoke('view.outlineSelection') ? this.selectionAlpha : 0;
 
         // configure colors
         const selectedClr = events.invoke('selectedClr');
@@ -347,7 +362,9 @@ class Splat extends Element {
     }
 
     focalPoint() {
-        return this.asset.resource?.getFocalPoint?.();
+        // GSplatData has a function for calculating an weighted average of the splat positions
+        // to get a focal point for the camera, but we use bound center instead
+        return this.worldBound.center;
     }
 
     move(position?: Vec3, rotation?: Quat, scale?: Vec3) {
@@ -480,6 +497,19 @@ class Splat extends Element {
 
     get transparency() {
         return this._transparency;
+    }
+
+    getPivot(mode: 'center' | 'boundCenter', selection: boolean, result: Transform) {
+        const { entity } = this;
+        switch (mode) {
+            case 'center':
+                result.set(entity.getLocalPosition(), entity.getLocalRotation(), entity.getLocalScale());
+                break;
+            case 'boundCenter':
+                entity.getLocalTransform().transformPoint((selection ? this.selectionBound : this.localBound).center, vec);
+                result.set(vec, entity.getLocalRotation(), entity.getLocalScale());
+                break;
+        }
     }
 }
 

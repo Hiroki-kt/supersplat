@@ -1,23 +1,26 @@
 import { Container, Label } from 'pcui';
-import { Mat4 } from 'playcanvas';
+import { Mat4, Vec3 } from 'playcanvas';
 
 import { DataPanel } from './data-panel';
 import { Events } from '../events';
 import { BottomToolbar } from './bottom-toolbar';
 import { CameraPanel } from './camera-panel';
 import { ColorPanel } from './color-panel';
-import { localizeInit } from './localization';
+import { localize, localizeInit } from './localization';
 import { Menu } from './menu';
 import { ModeToggle } from './mode-toggle';
 import logo from './playcanvas-logo.png';
 import { Popup, ShowOptions } from './popup';
+import { PublishSettingsDialog } from './publish-settings-dialog';
 import { RightToolbar } from './right-toolbar';
 import { ScenePanel } from './scene-panel';
 import { ShortcutsPopup } from './shortcuts-popup';
 import { Spinner } from './spinner';
+import { TimelinePanel } from './timeline-panel';
 import { Tooltips } from './tooltips';
 import { ViewCube } from './view-cube';
 import { ViewPanel } from './view-panel';
+import { ViewerExportPopup } from './viewer-export-popup';
 import { version } from '../../package.json';
 
 class EditorUI {
@@ -61,10 +64,36 @@ class EditorUI {
         const canvas = document.createElement('canvas');
         canvas.id = 'canvas';
 
-        // filename label
+        // app label
         const appLabel = new Label({
             id: 'app-label',
             text: `SUPERSPLAT v${version}`
+        });
+
+        // cursor label
+        const cursorLabel = new Label({
+            id: 'cursor-label'
+        });
+
+        let fullprecision = '';
+
+        events.on('camera.focalPointPicked', (details: { position: Vec3 }) => {
+            cursorLabel.text = `${details.position.x.toFixed(2)}, ${details.position.y.toFixed(2)}, ${details.position.z.toFixed(2)}`;
+            fullprecision = `${details.position.x}, ${details.position.y}, ${details.position.z}`;
+        });
+
+        ['pointerdown', 'pointerup', 'pointermove', 'wheel', 'dblclick'].forEach((eventName) => {
+            cursorLabel.dom.addEventListener(eventName, (event: Event) => event.stopPropagation());
+        });
+
+        cursorLabel.dom.addEventListener('pointerdown', () => {
+            navigator.clipboard.writeText(fullprecision);
+
+            const orig = cursorLabel.text;
+            cursorLabel.text = localize('cursor.copied');
+            setTimeout(() => {
+                cursorLabel.text = orig;
+            }, 1000);
         });
 
         // canvas container
@@ -93,6 +122,7 @@ class EditorUI {
 
         canvasContainer.dom.appendChild(canvas);
         canvasContainer.append(appLabel);
+        canvasContainer.append(cursorLabel);
         canvasContainer.append(toolsContainer);
         canvasContainer.append(scenePanel);
         canvasContainer.append(viewPanel);
@@ -115,23 +145,36 @@ class EditorUI {
             id: 'main-container'
         });
 
+        const timelinePanel = new TimelinePanel(events, tooltips);
         const dataPanel = new DataPanel(events);
 
         mainContainer.append(canvasContainer);
+        mainContainer.append(timelinePanel);
         mainContainer.append(dataPanel);
 
         editorContainer.append(mainContainer);
 
+        tooltips.register(cursorLabel, localize('cursor.click-to-copy'), 'top');
+
         // message popup
-        const popup = new Popup(topContainer);
-        topContainer.append(popup);
+        const popup = new Popup(tooltips);
 
         // shortcuts popup
         const shortcutsPopup = new ShortcutsPopup();
 
+        // export popup
+        const viewerExportPopup = new ViewerExportPopup(events);
+
+        // publish options
+        const publishSettingsDialog = new PublishSettingsDialog(events);
+
+        topContainer.append(popup);
+        topContainer.append(viewerExportPopup);
+        topContainer.append(publishSettingsDialog);
+
         appContainer.append(editorContainer);
-        appContainer.append(tooltipsContainer);
         appContainer.append(topContainer);
+        appContainer.append(tooltipsContainer);
         appContainer.append(shortcutsPopup);
 
         this.appContainer = appContainer;
@@ -146,6 +189,14 @@ class EditorUI {
 
         events.on('show.shortcuts', () => {
             shortcutsPopup.hidden = false;
+        });
+
+        events.function('show.viewerExportPopup', (filename?: string) => {
+            return viewerExportPopup.show(filename);
+        });
+
+        events.function('show.publishSettingsDialog', () => {
+            return publishSettingsDialog.show();
         });
 
         events.function('show.about', () => {
