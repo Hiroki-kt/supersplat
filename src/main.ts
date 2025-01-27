@@ -119,7 +119,7 @@ const main = async () => {
     const editHistory = new EditHistory(events);
 
     // editor ui
-    const editorUI = new EditorUI(events, !!remoteStorageDetails);
+    const editorUI = new EditorUI(events, remoteStorageDetails.isMatched);
 
     // create the graphics device
     const graphicsDevice = await createGraphicsDevice(editorUI.canvas, {

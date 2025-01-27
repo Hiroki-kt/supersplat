@@ -31,7 +31,7 @@ class EditorUI {
     canvas: HTMLCanvasElement;
     popup: Popup;
 
-    constructor(events: Events, remoteStorageMode: boolean) {
+    constructor(events: Events, isMatchedMode: boolean) {
         localizeInit();
 
         // favicon
@@ -67,7 +67,7 @@ class EditorUI {
         // app label
         const appLabel = new Label({
             id: 'app-label',
-            text: `SUPERSPLAT v${version}`
+            text: `SUPERSPLAT v${version} & CoNeRF v1.1`
         });
 
         // cursor label
@@ -124,7 +124,9 @@ class EditorUI {
         canvasContainer.append(appLabel);
         canvasContainer.append(cursorLabel);
         canvasContainer.append(toolsContainer);
-        canvasContainer.append(scenePanel);
+        if (!isMatchedMode) {
+            canvasContainer.append(scenePanel);
+        }
         canvasContainer.append(viewPanel);
         canvasContainer.append(cameraPanel);
         canvasContainer.append(colorPanel);

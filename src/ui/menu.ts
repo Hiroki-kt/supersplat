@@ -53,7 +53,8 @@ class Menu extends Container {
         });
 
         const exportDom = document.createElement('button');
-        exportDom.textContent = localize('export');
+        exportDom.textContent = localize('Export to CoNeRF');
+        exportDom.setAttribute('class', 'pcui-button');
         exportDom.addEventListener('click', () => {
             console.log('click export');
             events.fire('scene.uploadConerf');
@@ -104,15 +105,15 @@ class Menu extends Container {
         const buttonsContainer = new Container({
             id: 'menu-options-container'
         });
-        buttonsContainer.append(scene);
-        buttonsContainer.append(selection);
-        buttonsContainer.append(help);
-        buttonsContainer.append(collapse);
-        buttonsContainer.append(arrow);
+        // buttonsContainer.append(scene);
+        // buttonsContainer.append(selection);
+        // buttonsContainer.append(help);
+        // buttonsContainer.append(collapse);
+        // buttonsContainer.append(arrow);
 
         menubar.append(icon);
         menubar.append(exportButton);
-        menubar.append(buttonsContainer);
+        // menubar.append(buttonsContainer);
 
         const exportMenuPanel = new MenuPanel([{
             text: localize('scene.export.compressed-ply'),
