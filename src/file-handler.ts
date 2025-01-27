@@ -95,7 +95,8 @@ const download = (filename: string, data: Uint8Array) => {
 const sendToRemoteStorage = async (
     filename: string,
     data: ArrayBuffer,
-    remoteStorageDetails: RemoteStorageDetails
+    remoteStorageDetails: RemoteStorageDetails,
+    events: Events
 ) => {
     console.log('sending to remote');
     const formData = new FormData();
@@ -108,10 +109,23 @@ const sendToRemoteStorage = async (
         formData.append('version', remoteStorageDetails.version.toString());
     }
     console.log(formData);
-    await fetch(remoteStorageDetails.url, {
+    const res = await fetch(remoteStorageDetails.url, {
         method: remoteStorageDetails.method,
         body: formData
     });
+    if (res.status === 200) {
+        await events.invoke('showPopup', {
+            type: 'info',
+            header: 'UPLOAD SUCCESS',
+            message: 'File uploaded successfully'
+        });
+    } else {
+        await events.invoke('showPopup', {
+            type: 'error',
+            header: 'UPLOAD ERROR',
+            message: 'Error uploading file'
+        });
+    }
 };
 
 const loadCameraPoses = async (url: string, filename: string, events: Events) => {
@@ -572,7 +586,7 @@ const initFileHandler = (scene: Scene, events: Events, dropTarget: HTMLElement, 
                     }
                 };
                 await writeScene(options.type, writeFunc);
-                await sendToRemoteStorage(options.filename, data.slice(0, cursor), options.remote);
+                await sendToRemoteStorage(options.filename, data.slice(0, cursor), options.remote, events);
                 // download('test.ply', (cursor === data.byteLength) ? data : new Uint8Array(data.buffer, 0, cursor));
             }
         } catch (error) {
